@@ -1,0 +1,12 @@
+CREATE TABLE `category` (
+    `id` INT NOT NULL UNIQUE PRIMARY KEY AUTO_INCREMENT,
+    `parent_id` INT NULL,
+    `title` VARCHAR(255) NOT NULL,
+    `slug` VARCHAR(255) NOT NULL UNIQUE ,
+    `image` VARCHAR(255) NULL,
+    `deleted_at` TIMESTAMP NULL,
+    `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (`parent_id`) REFERENCES `category`(`id`) ,
+    CHECK (`parent_id` IS NULL OR `image` IS NULL)
+) ;
