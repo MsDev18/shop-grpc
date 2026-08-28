@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"shop/internal/api/grpc/auth"
 	"shop/internal/api/grpc/health"
 	healthpb "shop/internal/pb/health"
+	authpb "shop/internal/pb/auth"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -14,20 +16,23 @@ import (
 type Server struct {
 	grpcServer   *grpc.Server
 	healthServer health.Server
+	authServer auth.Server
 	address      string
 }
 
 
-func New (address string, healthServer health.Server) Server {
+func New (address string, healthServer health.Server, authServer auth.Server, authInterceptor auth.Interceptor) Server {
 	return Server{
-		grpcServer:   grpc.NewServer(),
+		grpcServer:   grpc.NewServer(grpc.UnaryInterceptor(authInterceptor.Unary())),
 		healthServer: healthServer,
+		authServer: authServer,
 		address:      address,
 	}
 }
 
 func (s Server) Run () {
 	healthpb.RegisterHealthServiceServer(s.grpcServer , s.healthServer)
+	authpb.RegisterAuthServiceServer(s.grpcServer , s.authServer)
 
 	reflection.Register(s.grpcServer)
 
