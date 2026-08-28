@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package auth;
+
+option go_package = "shop/internal/pb/auth";
+
+message SendOtpRequest {
+  string phone_number = 1;
+}
+
+message SendOtpResponse {
+
+}
+
+message CheckOtpRequest {
+  string phone_number = 1 ;
+  string code         = 2 ;
+}
+
+message CheckOtpResponse {
+  string access_token  = 1;
+  string refresh_token = 2 ;
+}
+
+message MeRequest {
+
+}
+
+message MeResponse {
+  uint64 user_id = 1;
+}
+
+message RefreshTokenRequest {
+  string refresh_token = 1;
+
+}
+
+message RefreshTokenResponse {
+  string access_token = 1;
+}
+
+message LogoutRequest {}
+message LogoutResponse {}
+
+service AuthService {
+    rpc SendOtp(SendOtpRequest) returns (SendOtpResponse);
+    rpc CheckOtp(CheckOtpRequest) returns (CheckOtpResponse);
+    rpc Me(MeRequest) returns (MeResponse);
+    rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
+    rpc Logout(LogoutRequest) returns (LogoutResponse);
+}
