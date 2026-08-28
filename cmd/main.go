@@ -5,7 +5,8 @@ import (
 	"shop/internal/api/server"
 	"shop/internal/migrator"
 	"shop/internal/repository/mysql"
-
+	grpchealth "shop/internal/api/grpc/health"
+	grpcserver "shop/internal/api/grpc"
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -28,6 +29,12 @@ func main() {
 	provinceHandler, provinceService := setupProvinceModule(mysqlRepo)
 	addressHandler := setupAddressModule(mysqlRepo, provinceService)
 	productHandler := setupProductModule(config.Upload , mysqlRepo, categoryService)
+	
+	
+	grpcHealthServer := grpchealth.New()
+	
+	go grpcserver.New("0.0.0.0:50051" , grpcHealthServer).Run()
+	
 	// create new http server and run it
 	httpServer := server.New(
 		config.Server,
