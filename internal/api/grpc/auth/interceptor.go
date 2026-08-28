@@ -55,10 +55,10 @@ func NewInterceptor(repository Repository, accessTokenSecret string) Interceptor
 }
 
 var publicMethods = map[string]bool{
-	"/auth/AuthService.SendOtp":      true,
-	"/auth/AuthService.CheckOtp":     true,
-	"/auth/AuthService.RefreshToken": true,
-	"health/HealthService.Check":     true,
+	"/auth.AuthService/SendOtp":      true,
+	"/auth.AuthService/CheckOtp":     true,
+	"/auth.AuthService/RefreshToken": true,
+	"/health.HealthService/Check":     true,
 }
 
 func (i Interceptor) Unary() grpc.UnaryServerInterceptor {

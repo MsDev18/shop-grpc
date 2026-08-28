@@ -8,7 +8,7 @@ import (
 )
 
 func ErrorToGrpc(err error) error {
-	if err != nil {
+	if err == nil {
 		return nil
 	}
 
