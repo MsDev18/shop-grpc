@@ -49,7 +49,7 @@ func (v Validator) UpdateProfile(ctx context.Context, req userdto.UpdateProfileR
 func (v Validator) validationAvatarImage(value interface{}) error {
 	const op = "user-validator.validationAvatarImage"
 	// 1. check value type and type assertion
-	fileHeader, ok := value.(*multipart.FileHeader)
+	avatar, ok := value.(*userdto.AvatarFile)
 	if !ok {
 		return richerror.New().
 			SetOp(op).
@@ -58,42 +58,25 @@ func (v Validator) validationAvatarImage(value interface{}) error {
 	}
 
 	// check fileHeader is nil, if nil -> no file uploaded, return nil
-	if fileHeader == nil {
+	if avatar == nil {
 		return nil
 	}
 
 	// 2. check file size
-	if fileHeader.Size > 1*1024*1024 {
+	if len(avatar.Content) > 1*1024*1024 {
 		return richerror.New().
 			SetOp(op).
 			SetMsg(fmt.Sprintf("file max size is %d MB", 1)).
 			SetKind(richerror.KindBadRequestErr)
 	}
 
-	// 3. open file
-	file, err := fileHeader.Open()
-	if err != nil {
-		return richerror.New().
-			SetOp(op).
-			SetMsg("can't open file").
-			SetKind(richerror.KindBadRequestErr)
-	}
-	defer file.Close()
 
-	// 4. check magic number for file content type
-	buf := make([]byte, 512)
-
-	n, err := file.Read(buf)
-	// io.EOF -> file bytes less then 512 OR empty file
-	if err != nil && !errors.Is(err, io.EOF) {
-		return richerror.New().
-			SetOp(op).
-			SetMsg("can't read file").
-			SetKind(richerror.KindUnexpectedErr).
-			SetErr(err)
+	n := len(avatar.Content)
+	if n > 512 {
+		n = 512
 	}
 
-	contentType := http.DetectContentType(buf[:n])
+	contentType := http.DetectContentType(avatar.Content[:n])
 	if contentType != "image/png" && contentType != "image/jpeg" {
 		return richerror.New().
 			SetOp(op).

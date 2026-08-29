@@ -1,13 +1,13 @@
 package main
 
 import (
+	_ "github.com/go-sql-driver/mysql"
+	grpcserver "shop/internal/api/grpc"
+	grpchealth "shop/internal/api/grpc/health"
 	"shop/internal/api/handler/health"
 	"shop/internal/api/server"
 	"shop/internal/migrator"
 	"shop/internal/repository/mysql"
-	grpchealth "shop/internal/api/grpc/health"
-	grpcserver "shop/internal/api/grpc"
-	_ "github.com/go-sql-driver/mysql"
 )
 
 func main() {
@@ -23,18 +23,22 @@ func main() {
 
 	// setup project handlers
 	healthHandler := health.New()
-	authHandler, authMiddleware, authGrpc, authInterceptor := SetupAuthModule(mysqlRepo, config.AuthService)
+	authHandler, authMiddleware, grpcAuthServer, authInterceptor := SetupAuthModule(mysqlRepo, config.AuthService)
 	userHandler := SetupUserModule(mysqlRepo, config.Upload)
 	categoryHandler, categoryService := SetupCategoryModule(mysqlRepo, config.Upload)
 	provinceHandler, provinceService := setupProvinceModule(mysqlRepo)
 	addressHandler := setupAddressModule(mysqlRepo, provinceService)
-	productHandler := setupProductModule(config.Upload , mysqlRepo, categoryService)
-	
-	
+	productHandler := setupProductModule(config.Upload, mysqlRepo, categoryService)
+
 	grpcHealthServer := grpchealth.New()
-	
-	go grpcserver.New("0.0.0.0:50051" , grpcHealthServer , authGrpc , authInterceptor).Run()
-	
+
+	go grpcserver.New(
+		"0.0.0.0:50051",
+		grpcHealthServer,
+		grpcAuthServer,
+		authInterceptor,
+	).Run()
+
 	// create new http server and run it
 	httpServer := server.New(
 		config.Server,

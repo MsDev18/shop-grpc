@@ -1,6 +1,7 @@
 package user
 
 import (
+	"bytes"
 	"context"
 	userdto "shop/internal/dto/user"
 )
@@ -10,7 +11,7 @@ func (s Service) UpdateProfile(ctx context.Context, userID uint, req userdto.Upd
 	// 1. process image and upload in server
 	var avatarURI *string
 	if req.Avatar != nil {
-		uri, processImageErr := s.imageProcessor.Process(ctx , req.Avatar)
+		uri, processImageErr := s.imageProcessor.Process(ctx , bytes.NewReader(req.Avatar.Content))
 		if processImageErr != nil {
 			return processImageErr
 		}

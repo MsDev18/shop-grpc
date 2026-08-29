@@ -1,6 +1,7 @@
 package user
 
 import (
+	"io"
 	authmiddleware "shop/internal/api/middleware/auth"
 	userdto "shop/internal/dto/user"
 	"shop/internal/pkg/response"
@@ -40,7 +41,36 @@ func (h Handler) UpdateProfile(ctx *gin.Context) {
 		namePtr = &name
 	}
 	// beacuse this field is optional, so we don't need to check error
-	avatar, _ := ctx.FormFile("avatar")
+
+	var avatar *userdto.AvatarFile
+	if fileHeader, ferr := ctx.FormFile("avatar"); ferr == nil && fileHeader != nil {
+		file, openErr := fileHeader.Open()
+		if openErr != nil {
+			response.New(ctx).Error(
+				richerror.New().
+					SetOp(op).
+					SetMsg("can't open uploaded file").
+					SetKind(richerror.KindBadRequestErr).
+					SetErr(openErr),
+			)
+			return
+		}
+		defer file.Close()
+
+		content, readErr := io.ReadAll(file)
+		if readErr != nil {
+			response.New(ctx).Error(
+				richerror.New().
+					SetOp(op).
+					SetMsg("can't read uploaded file").
+					SetKind(richerror.KindUnexpectedErr).
+					SetErr(readErr),
+			)
+			return
+		}
+		avatar = &userdto.AvatarFile{Filename: fileHeader.Filename, Content: content}
+	}
+
 	req := userdto.UpdateProfileRequest{
 		Name:   namePtr,
 		Avatar: avatar,

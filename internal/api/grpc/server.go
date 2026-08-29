@@ -23,10 +23,10 @@ type Server struct {
 
 func New (address string, healthServer health.Server, authServer auth.Server, authInterceptor auth.Interceptor) Server {
 	return Server{
+		address:      address,
 		grpcServer:   grpc.NewServer(grpc.UnaryInterceptor(authInterceptor.Unary())),
 		healthServer: healthServer,
 		authServer: authServer,
-		address:      address,
 	}
 }
 

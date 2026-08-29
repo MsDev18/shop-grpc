@@ -4,30 +4,19 @@ import (
 	"bytes"
 	"context"
 	"image/png"
-	"mime/multipart"
+	"io"
 	"shop/internal/pkg/richerror"
 
 	"github.com/disintegration/imaging"
 )
 
-func (p Processor) Process(ctx context.Context, fileHeader *multipart.FileHeader) (string, error) {
+func (p Processor) Process(ctx context.Context, r io.Reader) (string, error) {
 	const op = "imageprocessor.Process"
-
-	// 1. open the upload file
-	file, err := fileHeader.Open()
-	if err != nil {
-		return "", richerror.New().
-			SetOp(op).
-			SetMsg("can't open file").
-			SetKind(richerror.KindUnexpectedErr).
-			SetErr(err)
-	}
-	defer file.Close()
 
 	// 2. decode - AutoOrientation fixes photos that look sideways, because
 	// phone cameras store rotation as EXIF metadata instead of rotating
 	// the actual pixels
-	img, err := imaging.Decode(file, imaging.AutoOrientation(true))
+	img, err := imaging.Decode(r, imaging.AutoOrientation(true))
 	if err != nil {
 		return "", richerror.New().
 			SetOp(op).
