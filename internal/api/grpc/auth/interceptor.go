@@ -61,6 +61,8 @@ var publicMethods = map[string]bool{
 	"/health.HealthService/Check":      true,
 	"/category.CategoryService/GetAll": true,
 	"/category.CategoryService/GetOne": true,
+	"/province.ProvinceService/GetOne": true,
+	"/province.ProvinceService/GetAll": true,
 }
 
 func (i Interceptor) Unary() grpc.UnaryServerInterceptor {

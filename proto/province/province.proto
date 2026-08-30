@@ -1,0 +1,27 @@
+syntax = "proto3" ;
+
+package province ;
+
+option go_package = "shop/internal/pb/province";
+
+message ProvinceResponse {
+  uint64 id   = 1;
+  string name = 2;
+}
+
+message GetAllRequest {
+
+}
+
+message GetAllResponse {
+  repeated ProvinceResponse provinces = 1;
+}
+
+message GetOneRequest {
+  uint64 id = 1;
+}
+
+service ProvinceService {
+  rpc GetAll(GetAllRequest) returns (GetAllResponse);
+  rpc GetOne(GetOneRequest) returns (ProvinceResponse);
+}

@@ -26,7 +26,7 @@ func main() {
 	authHandler, authMiddleware, grpcAuthServer, authInterceptor := SetupAuthModule(mysqlRepo, config.AuthService)
 	userHandler, grpcUserServer := SetupUserModule(mysqlRepo, config.Upload)
 	categoryHandler, categoryService, grpcCategoryServer := SetupCategoryModule(mysqlRepo, config.Upload)
-	provinceHandler, provinceService := setupProvinceModule(mysqlRepo)
+	provinceHandler, provinceService, grpcProvinceServer := setupProvinceModule(mysqlRepo)
 	addressHandler := setupAddressModule(mysqlRepo, provinceService)
 	productHandler := setupProductModule(config.Upload, mysqlRepo, categoryService)
 
@@ -38,6 +38,7 @@ func main() {
 		grpcAuthServer,
 		grpcUserServer,
 		grpcCategoryServer,
+		grpcProvinceServer,
 		authInterceptor,
 	).Run()
 
