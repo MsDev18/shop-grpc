@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"mime/multipart"
 	"net/http"
 	userdto "shop/internal/dto/user"
 	"shop/internal/pkg/richerror"

@@ -24,7 +24,7 @@ func main() {
 	// setup project handlers
 	healthHandler := health.New()
 	authHandler, authMiddleware, grpcAuthServer, authInterceptor := SetupAuthModule(mysqlRepo, config.AuthService)
-	userHandler := SetupUserModule(mysqlRepo, config.Upload)
+	userHandler ,grpcUserServer := SetupUserModule(mysqlRepo, config.Upload)
 	categoryHandler, categoryService := SetupCategoryModule(mysqlRepo, config.Upload)
 	provinceHandler, provinceService := setupProvinceModule(mysqlRepo)
 	addressHandler := setupAddressModule(mysqlRepo, provinceService)
@@ -36,6 +36,7 @@ func main() {
 		"0.0.0.0:50051",
 		grpcHealthServer,
 		grpcAuthServer,
+		grpcUserServer,
 		authInterceptor,
 	).Run()
 

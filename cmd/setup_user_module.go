@@ -1,6 +1,7 @@
 package main
 
 import (
+	"shop/internal/api/grpc/user"
 	handler "shop/internal/api/handler/user"
 	"shop/internal/pkg/imageprocessor"
 	"shop/internal/pkg/imageprocessor/localstorage"
@@ -8,14 +9,16 @@ import (
 	repository "shop/internal/repository/mysql/user"
 	service "shop/internal/service/user"
 	validator "shop/internal/validator/user"
+
 )
 
-func SetupUserModule(mysqlRepo  mysql.Connection, uploadConfig imageprocessor.Config) handler.Handler {
+func SetupUserModule(mysqlRepo  mysql.Connection, uploadConfig imageprocessor.Config) (handler.Handler, user.Server) {
 	repository := repository.New(mysqlRepo)
 	storage := localstorage.New("avatar")
 	imageProcessor := imageprocessor.New(uploadConfig , storage)
-	service  := service.New(repository, imageProcessor)
-	validator := validator.New()
-	handler := handler.New(service , validator)
-	return handler
+	svc  := service.New(repository, imageProcessor)
+	val := validator.New()
+	userGrpc := user.New(svc , val)
+	handler := handler.New(svc , val)
+	return handler , userGrpc
 }

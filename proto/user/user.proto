@@ -4,3 +4,31 @@ package user;
 
 option go_package = "shop/internal/user" ;
 
+message ProfileRequest {}
+
+message ProfileResponse {
+  string name         = 1 ;
+  string avatar       = 2;
+  string phone_number = 3 ;
+}
+
+message UpdateProfileRequest {
+  optional string name   = 1;
+  bytes           avatar = 2;
+}
+
+message UpdateProfileResponse {}
+
+message ChangePasswordRequest {
+  string password         = 1 ;
+  string confirm_password = 2;
+}
+
+message ChangePasswordResponse {
+}
+
+service UserService {
+  rpc Profile(ProfileRequest) returns (ProfileResponse) ;
+  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse) ;
+  rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse);
+}
