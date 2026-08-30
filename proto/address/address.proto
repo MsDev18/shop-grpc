@@ -1,0 +1,57 @@
+syntax = "proto3" ;
+
+package address ;
+
+option go_package = "shop/internal/pb/address" ;
+
+message AddressResponse {
+  uint64 id          = 1;
+  string title       = 2;
+  string province    = 3;
+  string city        = 4;
+  string address     = 5;
+  string postal_code = 6;
+}
+
+message CreateRequest {
+  string title       = 1;
+  uint64 province_id = 2;
+  string city        = 3;
+  string address     = 4;
+  string postal_code = 5;
+}
+
+message GetAllRequest {}
+
+message GetAllResponse {
+  repeated AddressResponse addresses = 1;
+}
+
+message GetOneRequest {
+  uint64 id = 1;
+}
+
+message UpdateRequest {
+  uint64          id          = 1;
+  optional string title       = 2;
+  optional uint64 province_id = 3;
+  optional string city        = 4;
+  optional string address     = 5;
+  optional string postal_code = 6;
+}
+
+message UpdateResponse {}
+
+message DeleteRequest {
+  uint64 id = 1;
+}
+
+message DeleteResponse {}
+
+service AddressService {
+  rpc Create(CreateRequest) returns (AddressResponse);
+  rpc GetAll(GetAllRequest) returns (GetAllResponse);
+  rpc GetOne(GetOneRequest) returns (AddressResponse);
+  rpc Update(UpdateRequest) returns (UpdateResponse);
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+}
