@@ -1,8 +1,10 @@
 package category
 
 import (
+	"io"
 	dto "shop/internal/dto/category"
 	"shop/internal/pkg/response"
+	"shop/internal/pkg/richerror"
 
 	"github.com/gin-gonic/gin"
 )
@@ -22,7 +24,31 @@ func (h Handler) Update(ctx *gin.Context) {
 		updatedSlugPtr = &updatedSlug
 	}
 
-	image, _ := ctx.FormFile("image")
+	var image *dto.ImageFile
+	if fileHeader, err := ctx.FormFile("image"); fileHeader != nil && err == nil {
+		file, err := fileHeader.Open()
+		if err != nil {
+			response.New(ctx).Error(
+				richerror.New().
+					SetOp(op).
+					SetMsg("cna't open uploaded file").
+					SetKind(richerror.KindBadRequestErr).
+					SetErr(err),
+			)
+		}
+		defer file.Close()
+
+		content, readErr := io.ReadAll(file)
+		if readErr != nil {
+			response.New(ctx).Error(
+				richerror.New().SetOp(op).SetMsg("can't read uploaded image").
+					SetKind(richerror.KindUnexpectedErr).SetErr(readErr),
+			)
+			return
+		}
+
+		image = &dto.ImageFile{Filename: fileHeader.Filename, Content: content}
+	}
 
 	// map to dto.Update
 	req := dto.UpdateRequest{
@@ -38,7 +64,7 @@ func (h Handler) Update(ctx *gin.Context) {
 	}
 
 	// service
-	res ,serviceErr := h.service.Update(ctx.Request.Context(), slug, req)
+	res, serviceErr := h.service.Update(ctx.Request.Context(), slug, req)
 	if serviceErr != nil {
 		response.New(ctx).Error(serviceErr)
 		return

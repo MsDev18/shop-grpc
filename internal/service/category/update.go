@@ -1,6 +1,7 @@
 package category
 
 import (
+	"bytes"
 	"context"
 	dto "shop/internal/dto/category"
 	"shop/internal/pkg/richerror"
@@ -34,20 +35,10 @@ func (s Service) Update(ctx context.Context, slug string, req dto.UpdateRequest)
 			SetMsg("child category is not allowed to upload image").
 			SetKind(richerror.KindBadRequestErr)
 	}
-	// upload image & call imageProcessor
+	// 3. upload image
 	var imageURI *string
 	if req.Image != nil {
-		file, openErr := req.Image.Open()
-		if openErr != nil {
-			return dto.CreateResponse{}, richerror.New().
-				SetOp(op).
-				SetMsg("can't open uploaded image").
-				SetKind(richerror.KindBadRequestErr).
-				SetErr(openErr)
-		}
-		defer file.Close()
-
-		url, err := s.imageProcessor.Process(ctx, file)
+		url, err := s.imageProcessor.Process(ctx, bytes.NewReader(req.Image.Content))
 		if err != nil {
 			return dto.CreateResponse{}, err
 		}

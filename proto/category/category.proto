@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package category ;
+
+option go_package = "shop/internal/pb/category" ;
+
+message CategoryResponse {
+  uint64                    id        = 1 ;
+  string                    title     = 2;
+  string                    slug      = 3;
+  optional uint64           parent_id = 4;
+  optional string           image     = 5;
+  repeated CategoryResponse children  = 6;
+}
+
+message CreateRequest {
+  optional uint64 parent_id = 1;
+  string          title     = 2 ;
+  string          slug      = 3;
+  bytes           image     = 4;
+}
+
+message UpdateRequest {
+    string slug = 1;
+    optional string title = 2;
+    optional string new_slug = 3;
+    bytes image = 4;
+}
+
+message DeleteRequest {
+    string slug = 1;
+}
+
+message DeleteResponse {}
+
+message GetAllRequest {}
+
+message GetAllResponse {
+  repeated CategoryResponse categories = 1;
+}
+
+message GetOneRequest {
+  string slug = 1;
+}
+
+service CategoryService {
+  rpc Create(CreateRequest) returns (CategoryResponse);
+  rpc Update(UpdateRequest) returns (CategoryResponse);
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+  rpc GetAll(GetAllRequest) returns (GetAllResponse);
+  rpc GetOne(GetOneRequest) returns (CategoryResponse);
+}

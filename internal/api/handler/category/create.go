@@ -1,7 +1,9 @@
 package category
 
 import (
+	"io"
 	categorydto "shop/internal/dto/category"
+	dto "shop/internal/dto/category"
 	"shop/internal/pkg/response"
 	"shop/internal/pkg/richerror"
 	"strconv"
@@ -30,7 +32,31 @@ func (h Handler) Create(ctx *gin.Context) {
 		v := uint(id)
 		parentID = &v
 	}
-	image , _ := ctx.FormFile("image")
+	
+
+	var image *dto.ImageFile
+	if fileHeader , err := ctx.FormFile("image") ; err != nil  && fileHeader != nil {
+		file, openErr := fileHeader.Open()
+		if openErr != nil {
+			response.New(ctx).Error(
+				richerror.New().SetOp(op).SetMsg("can't open uploaded image").
+					SetKind(richerror.KindBadRequestErr).SetErr(openErr),
+			)
+			return
+		}
+		defer file.Close()
+
+		content, readErr := io.ReadAll(file)
+		if readErr != nil {
+			response.New(ctx).Error(
+				richerror.New().SetOp(op).SetMsg("can't read uploaded image").
+					SetKind(richerror.KindUnexpectedErr).SetErr(readErr),
+			)
+			return
+		}
+
+		image = &categorydto.ImageFile{Filename: fileHeader.Filename, Content: content}
+	}
 
 	// create CreateRequestDTO 
 	req := categorydto.CreateRequest{

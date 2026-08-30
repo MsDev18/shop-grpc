@@ -1,6 +1,7 @@
 package category
 
 import (
+	"bytes"
 	"context"
 	dto "shop/internal/dto/category"
 	"shop/internal/entity"
@@ -37,17 +38,7 @@ func (s Service) Create(ctx context.Context, req dto.CreateRequest) (dto.CreateR
 	// 3. upload image
 	var imageURL *string
 	if req.Image != nil {
-		file, openErr := req.Image.Open()
-		if openErr != nil {
-			return dto.CreateResponse{}, richerror.New().
-				SetOp(op).
-				SetMsg("can't open uploaded image").
-				SetKind(richerror.KindBadRequestErr).
-				SetErr(openErr)
-		}
-		defer file.Close()
-
-		image, err := s.imageProcessor.Process(ctx, file)
+		image, err := s.imageProcessor.Process(ctx, bytes.NewReader(req.Image.Content))
 		if err != nil {
 			return dto.CreateResponse{}, err
 		}

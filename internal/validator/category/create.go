@@ -3,10 +3,9 @@ package category
 import (
 	"context"
 	"errors"
-	"io"
-	"mime/multipart"
 	"net/http"
 	categorydto "shop/internal/dto/category"
+	dto "shop/internal/dto/category"
 	"shop/internal/pkg/richerror"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -56,7 +55,7 @@ func (v Validator) Create(ctx context.Context, req categorydto.CreateRequest) er
 func (v Validator) validateImage(value any) error {
 	const op = "category-validator.validateImage"
 
-	fileHeader, ok := value.(*multipart.FileHeader)
+	image, ok := value.(*dto.ImageFile)
 	if !ok {
 		return richerror.New().
 			SetOp(op).
@@ -64,38 +63,25 @@ func (v Validator) validateImage(value any) error {
 			SetKind(richerror.KindBadRequestErr)
 	}
 
-	if fileHeader == nil {
+	if image == nil {
 		return nil
 	}
 
-	if fileHeader.Size > 1024*1024*1 {
+	if len(image.Content) > 1024*1024*1 {
 		return richerror.New().
 			SetOp(op).
 			SetMsg("file max size is 1 MB").
 			SetKind(richerror.KindBadRequestErr)
 	}
 
-	file, err := fileHeader.Open()
-	if err != nil {
-		return richerror.New().
-			SetOp(op).
-			SetMsg("can't open file").
-			SetKind(richerror.KindUnexpectedErr).
-			SetErr(err)
-	}
-	defer file.Close()
+	
 
-	buf := make([]byte, 512)
-	n, err := file.Read(buf)
-	if err != nil && !errors.Is(err, io.EOF) {
-		return richerror.New().
-			SetOp(op).
-			SetMsg("can't read file").
-			SetKind(richerror.KindUnexpectedErr).
-			SetErr(err)
+	n := len(image.Content)
+	if n > 512 {
+		n = 512
 	}
 
-	contentType := http.DetectContentType(buf[:n])
+	contentType := http.DetectContentType(image.Content[:n])
 	if contentType != "image/png" && contentType != "image/jpeg" {
 		return richerror.New().
 			SetOp(op).
