@@ -1,4 +1,23 @@
-api -
+## gRPC migration (strangler pattern)
+
+Converting this API from REST-only to gRPC, module by module, without a rewrite: the gRPC
+server runs on `:50051` in a goroutine alongside the untouched Gin server on `:3000` (both
+call the exact same service layer). Once every module below is converted and verified, the
+REST layer gets removed entirely — single database, single process, no microservices split.
+
+- [x] health    — `health.HealthService` (Check)
+- [x] auth      — `auth.AuthService` (SendOtp, CheckOtp, Me, RefreshToken, Logout)
+- [x] user      — `user.UserService` (Profile, UpdateProfile, ChangePassword)
+- [x] category  — `category.CategoryService` (Create, Update, Delete, GetAll, GetOne)
+- [x] province  — `province.ProvinceService` (GetAll, GetOne)
+- [x] address   — `address.AddressService` (Create, GetAll, GetOne, Update, Delete)
+- [ ] product    — not started; first module needing client-streaming (gallery image upload)
+- [ ] cart / order / payment — not built in REST yet either, so no gRPC work until they exist
+- [ ] remove Gin/REST entirely once product (and anything built after it) is converted
+
+---
+
+## api -
 |____ health
 |        |_____ GET /health-check ✅
 |
