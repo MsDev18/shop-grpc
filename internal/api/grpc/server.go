@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"shop/internal/api/grpc/address"
 	"shop/internal/api/grpc/auth"
 	"shop/internal/api/grpc/category"
 	"shop/internal/api/grpc/health"
 	"shop/internal/api/grpc/province"
 	"shop/internal/api/grpc/user"
+	addresspb "shop/internal/pb/address"
 	authpb "shop/internal/pb/auth"
 	categorypb "shop/internal/pb/category"
 	healthpb "shop/internal/pb/health"
@@ -26,10 +28,11 @@ type Server struct {
 	userServer     user.Server
 	categoryServer category.Server
 	provinceServer province.Server
+	addressServer  address.Server
 	address        string
 }
 
-func New(address string, healthServer health.Server, authServer auth.Server, userServer user.Server, categoryServer category.Server, provinceServer province.Server, authInterceptor auth.Interceptor) Server {
+func New(address string, healthServer health.Server, authServer auth.Server, userServer user.Server, categoryServer category.Server, provinceServer province.Server, addressServer address.Server, authInterceptor auth.Interceptor) Server {
 	return Server{
 		address:        address,
 		grpcServer:     grpc.NewServer(grpc.UnaryInterceptor(authInterceptor.Unary())),
@@ -37,6 +40,7 @@ func New(address string, healthServer health.Server, authServer auth.Server, use
 		authServer:     authServer,
 		userServer:     userServer,
 		categoryServer: categoryServer,
+		addressServer:  addressServer,
 		provinceServer: provinceServer,
 	}
 }
@@ -47,6 +51,7 @@ func (s Server) Run() {
 	userpb.RegisterUserServiceServer(s.grpcServer, s.userServer)
 	categorypb.RegisterCategoryServiceServer(s.grpcServer, s.categoryServer)
 	provincepb.RegisterProvinceServiceServer(s.grpcServer, s.provinceServer)
+	addresspb.RegisterAddressServiceServer(s.grpcServer, s.addressServer)
 
 	reflection.Register(s.grpcServer)
 
