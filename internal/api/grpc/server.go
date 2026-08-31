@@ -32,9 +32,9 @@ type Server struct {
 	address        string
 }
 
-func New(address string, healthServer health.Server, authServer auth.Server, userServer user.Server, categoryServer category.Server, provinceServer province.Server, addressServer address.Server, authInterceptor auth.Interceptor) Server {
+func New(addr string, healthServer health.Server, authServer auth.Server, userServer user.Server, categoryServer category.Server, provinceServer province.Server, addressServer address.Server, authInterceptor auth.Interceptor) Server {
 	return Server{
-		address:        address,
+		address:        addr,
 		grpcServer:     grpc.NewServer(grpc.UnaryInterceptor(authInterceptor.Unary())),
 		healthServer:   healthServer,
 		authServer:     authServer,
