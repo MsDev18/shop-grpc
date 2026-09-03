@@ -29,7 +29,7 @@ func main() {
 
 	grpcHealthServer := grpchealth.New()
 
-	go grpcserver.New(
+	grpcserver.New(
 		"0.0.0.0:50051",
 		grpcHealthServer,
 		grpcAuthServer,

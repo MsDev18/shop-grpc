@@ -1,9 +1,10 @@
-## gRPC migration (strangler pattern)
+## gRPC migration (strangler pattern) — done
 
-Converting this API from REST-only to gRPC, module by module, without a rewrite: the gRPC
-server runs on `:50051` in a goroutine alongside the untouched Gin server on `:3000` (both
-call the exact same service layer). Once every module below is converted and verified, the
-REST layer gets removed entirely — single database, single process, no microservices split.
+Converted this API from REST-only to gRPC, module by module, without a rewrite: a gRPC
+server ran on `:50051` in a goroutine alongside the Gin server on `:3000` until every module
+below had a gRPC equivalent, then the REST/Gin layer (`handler`, `middleware`, `router`,
+`server` packages) was deleted entirely. The project now runs as a single gRPC-only process
+on `:50051`, single database, single binary.
 
 - [x] health    — `health.HealthService` (Check)
 - [x] auth      — `auth.AuthService` (SendOtp, CheckOtp, Me, RefreshToken, Logout)
@@ -11,70 +12,95 @@ REST layer gets removed entirely — single database, single process, no microse
 - [x] category  — `category.CategoryService` (Create, Update, Delete, GetAll, GetOne)
 - [x] province  — `province.ProvinceService` (GetAll, GetOne)
 - [x] address   — `address.AddressService` (Create, GetAll, GetOne, Update, Delete)
-- [ ] product    — not started; first module needing client-streaming (gallery image upload)
-- [ ] cart / order / payment — not built in REST yet either, so no gRPC work until they exist
-- [ ] remove Gin/REST entirely once product (and anything built after it) is converted
+- [x] product   — `product.ProductService` (Create [client-streaming], GetAll, GetOneBySlug)
+- [x] remove Gin/REST entirely
+- [ ] cart / order / payment — not built in REST or gRPC yet
+- [ ] decide how uploaded images get served now that Gin's static `/uploads` route is gone
+      (removed along with REST; gRPC has no built-in equivalent)
+
+---
+
+## Microservices migration (next phase)
+
+Now that the whole API is gRPC-only, the next phase is splitting this single monolith
+process into independently deployable services. Agreed approach:
+
+- Gradual, one service at a time — not a big-bang split of the whole system at once.
+- Each extracted service gets its own database from day one (real data ownership per
+  service, not a shared-DB "distributed monolith" stepping stone).
+- Every other module's direct in-process call into the extracted service (e.g. product's
+  `categoryService category.Service` dependency) must be rewired from a plain Go function
+  call into a real gRPC client call over the network — this is the actual cost of each
+  extraction, and the reason it's done deliberately one module at a time instead of all at
+  once.
+
+- [ ] decide which module goes first
+- [ ] design the data-ownership / migration plan for that module's tables
+- [ ] introduce a gRPC client (instead of a direct Go interface) wherever another module
+      currently calls it in-process
+- [ ] decide on service discovery / addressing between services
+- [ ] decide on deployment shape (separate binaries? separate repos? multiple `cmd/` entries
+      in this repo?)
 
 ---
 
 ## api -
 |____ health
-|        |_____ GET /health-check ✅
+|        |_____ health.HealthService/Check ✅
 |
 |____ auth
-|        |_____ POST /auth/send-otp ✅
-|        |_____ POST /auth/check-otp ✅
-|        |_____ GET /auth/me ✅
-|        |_____ POST /auth/logout ✅
-|        |_____ POST /auth/refresh-token ✅
+|        |_____ auth.AuthService/SendOtp ✅
+|        |_____ auth.AuthService/CheckOtp ✅
+|        |_____ auth.AuthService/Me ✅
+|        |_____ auth.AuthService/Logout ✅
+|        |_____ auth.AuthService/RefreshToken ✅
 |
 |____ user
-|        |_____ GET /user/profile ✅
-|        |_____ PATCH /user/update-profile ✅
-|        |_____ PATCH /user/change-password ✅
+|        |_____ user.UserService/Profile ✅
+|        |_____ user.UserService/UpdateProfile ✅
+|        |_____ user.UserService/ChangePassword ✅
 |
 |____ province
-|        |_____ GET /province ✅
-|        |_____ GET /province/:id ✅
+|        |_____ province.ProvinceService/GetAll ✅
+|        |_____ province.ProvinceService/GetOne ✅
 |
 |____ address
-|        |_____ POST /address ✅
-|        |_____ GET /address ✅
-|        |_____ GET /address/:id ✅
-|        |_____ PATCH /address/:id ✅
-|        |_____ DELETE /address/:id ✅
+|        |_____ address.AddressService/Create ✅
+|        |_____ address.AddressService/GetAll ✅
+|        |_____ address.AddressService/GetOne ✅
+|        |_____ address.AddressService/Update ✅
+|        |_____ address.AddressService/Delete ✅
 |
 |____ category
-|        |_____ POST /category ✅ (admin)
-|        |_____ GET /category ✅
-|        |_____ GET /category/:slug ✅
-|        |_____ PATCH /category/:slug ✅ (admin)
-|        |_____ DELETE /category/:slug ✅ (admin)
+|        |_____ category.CategoryService/Create ✅ (admin)
+|        |_____ category.CategoryService/GetAll ✅
+|        |_____ category.CategoryService/GetOne ✅
+|        |_____ category.CategoryService/Update ✅ (admin)
+|        |_____ category.CategoryService/Delete ✅ (admin)
 |
 |____ product
-|        |_____ POST /product (admin) ✅
-|        |_____ GET /product  -> list, pagination + filter(category,price) + search + sort
-|        |_____ GET /product/:slug ✅
-|        |_____ PATCH /product/:slug (admin)
-|        |_____ DELETE /product/:slug (admin)
-|        |_____ GET /category/:slug/products
+|        |_____ product.ProductService/Create ✅ (admin, client-streaming — metadata + gallery images)
+|        |_____ product.ProductService/GetAll ✅ (pagination + optional category_slug filter; no price filter/search/sort yet)
+|        |_____ product.ProductService/GetOneBySlug ✅
+|        |_____ product.ProductService/Update -> not built yet
+|        |_____ product.ProductService/Delete -> not built yet
 |
 |____ cart
-|        |_____ GET /cart
-|        |_____ POST /cart/items
-|        |_____ PATCH /cart/items/:id
-|        |_____ DELETE /cart/items/:id
-|        |_____ DELETE /cart
+|        |_____ get current cart
+|        |_____ add item
+|        |_____ update item quantity
+|        |_____ remove item
+|        |_____ clear cart
 |
 |____ order
-|        |_____ POST /order          -> checkout, build order from current cart + address_id
-|        |_____ GET /order           -> current user's order history
-|        |_____ GET /order/:id
-|        |_____ PATCH /order/:id/cancel
-|        |_____ GET /admin/order (admin)          -> list all orders
-|        |_____ PATCH /order/:id/status (admin)   -> processing/shipped/delivered/canceled
+|        |_____ checkout -> build order from current cart + address
+|        |_____ current user's order history
+|        |_____ get one order
+|        |_____ cancel order
+|        |_____ (admin) list all orders
+|        |_____ (admin) update order status -> processing/shipped/delivered/canceled
 |
 |____ payment
-|        |_____ POST /order/:id/pay        -> init payment / redirect to gateway
-|        |_____ POST /payment/callback     -> gateway webhook, confirm payment & update order
+|        |_____ init payment / redirect to gateway
+|        |_____ gateway webhook -> confirm payment & update order
 |

@@ -2,14 +2,15 @@
 
 A backend for an online shop, built in Go with a clean, layered architecture. This is a
 learning project focused on writing idiomatic, well-structured backend Go — not a finished
-storefront yet, but the foundation (auth, users, categories, addresses) is production-quality.
-It is being migrated from REST-only to **gRPC**, module by module, using the strangler-fig
-pattern: both protocols run side by side against the same service layer until the migration
-is complete.
+storefront yet, but the foundation (auth, users, categories, products, addresses) is
+production-quality. It was migrated from REST to **gRPC-only**, module by module, using the
+strangler-fig pattern (REST and gRPC ran side by side until every module had a gRPC
+equivalent, then the REST/Gin layer was deleted entirely). The next phase, now starting, is
+splitting this single monolith process into independently deployable microservices, one
+module at a time.
 
 ![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)
-![Gin](https://img.shields.io/badge/Gin-Web%20Framework-008ECF)
-![gRPC](https://img.shields.io/badge/gRPC-migrating-4285F4?logo=grpc&logoColor=white)
+![gRPC](https://img.shields.io/badge/gRPC-only-4285F4?logo=grpc&logoColor=white)
 ![MySQL](https://img.shields.io/badge/MySQL-8.4-4479A1?logo=mysql&logoColor=white)
 ![Status](https://img.shields.io/badge/status-in%20development-yellow)
 
@@ -18,11 +19,10 @@ is complete.
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Architecture](#architecture)
-- [gRPC Migration](#grpc-migration)
+- [Migration History](#migration-history)
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
 - [Configuration](#configuration)
-- [API Reference (REST)](#api-reference-rest)
 - [API Reference (gRPC)](#api-reference-grpc)
 - [Authentication Flow](#authentication-flow)
 - [Roadmap](#roadmap)
@@ -30,29 +30,28 @@ is complete.
 
 ## Features
 
-- **Clean architecture** — strict separation between `handler` → `validator` → `service` →
-  `repository` layers, with each layer depending only on interfaces of the layer below it.
-  Both the REST handlers and the gRPC servers sit on top of the exact same `validator` /
-  `service` / `repository` layers — only the transport-facing layer differs per protocol.
+- **Clean architecture** — strict separation between `grpc server` → `validator` → `service`
+  → `repository` layers, with each layer depending only on interfaces of the layer below it.
 - **OTP + JWT authentication** — phone-number login via one-time codes (generated with
   `crypto/rand`, not `math/rand`), backed by short-lived access tokens and long-lived refresh
   tokens.
 - **Real session revocation** — refresh tokens are tied to a session record in the database,
   so logout actually invalidates a session instead of just discarding a token client-side.
-  This is enforced identically for REST (Gin middleware) and gRPC (a unary interceptor).
-- **Role-based access control** — only admins can create/update/delete categories, for
-  example — enforced via REST middleware and, on the gRPC side, an equivalent
-  `auth.RequireRole` check inside each handler.
+  Enforced globally by a `grpc.UnaryServerInterceptor` / `grpc.StreamServerInterceptor` pair.
+- **Role-based access control** — split into two composable interceptors, chained via
+  `grpc.ChainUnaryInterceptor` / `grpc.ChainStreamInterceptor`: an authentication interceptor
+  (is this caller logged in?) and a separate authorization interceptor (does this method
+  require a specific role, and does the caller have it?), driven by a declarative
+  `requiredRoles` map keyed by full gRPC method name.
 - **Storage-agnostic image pipeline** — uploaded images are validated by content sniffing
   (not just file extension), auto-oriented, resized, and re-encoded before being handed to a
   pluggable `Storage` interface (local disk today, swappable for S3 or similar later without
-  touching business logic). Image bytes travel as `multipart.FileHeader` on the REST side and
-  as raw `bytes` fields on the gRPC side, converging on the same in-memory representation
-  before reaching the service layer.
+  touching business logic). Image bytes travel as raw `bytes` proto fields, and product
+  gallery images use client-streaming so multiple images can be sent without one giant
+  message.
 - **Structured error handling** — a custom `richerror` package carries operation, message,
-  kind, and metadata through every layer. A `mapper` package turns a `richerror.Kind` into
-  either an HTTP status code (REST) or a `google.golang.org/grpc/codes.Code` (gRPC), so both
-  protocols report the same logical error consistently.
+  kind, and metadata through every layer. A `mapper` package turns a `richerror.Kind` into a
+  `google.golang.org/grpc/codes.Code`, so every module reports errors consistently.
 - **Configuration via `.env` + YAML** — secrets and per-environment values load from `.env`,
   general settings from `config.yml`, merged with [koanf](https://github.com/knadh/koanf).
 - **Migrations built into the binary** — schema migrations run automatically on startup via a
@@ -64,7 +63,6 @@ is complete.
 | Layer | Choice |
 |---|---|
 | Language | Go 1.26 |
-| REST framework | [Gin](https://github.com/gin-gonic/gin) |
 | RPC framework | [gRPC-Go](https://github.com/grpc/grpc-go) + [Protocol Buffers](https://protobuf.dev/) (`protoc`, `protoc-gen-go`, `protoc-gen-go-grpc`) |
 | Database | MySQL 8.4 (`database/sql` + `go-sql-driver/mysql`, no ORM) |
 | Migrations | [golang-migrate](https://github.com/golang-migrate/migrate) |
@@ -76,63 +74,56 @@ is complete.
 
 ## Architecture
 
-Every request flows through the same pipeline, regardless of module — the only thing that
-changes between REST and gRPC is the top two layers:
+Every request flows through the same pipeline, regardless of module:
 
 ```
- REST request                          gRPC request
-     │                                      │
-     ▼                                      ▼
- Router (gin route groups)          Unary interceptor (auth.Interceptor)
-     │                                      │
-     ▼                                      ▼
- Middleware (auth / role checks)     gRPC server method (per module)
-     │                                      │
-     └──────────────────┬───────────────────┘
-                         ▼
-                    Validator      — business-rule and input validation (ozzo-validation)
-                         │
-                         ▼
-                    Service        — business logic, orchestrates repositories
-                         │
-                         ▼
-                    Repository     — raw SQL against MySQL, maps rows to entities
+ gRPC request
+     │
+     ▼
+ Auth interceptor (authentication — is this caller logged in?)
+     │
+     ▼
+ Role interceptor (authorization — does this method require a role, and does the caller have it?)
+     │
+     ▼
+ gRPC server method (per module)
+     │
+     ▼
+ Validator      — business-rule and input validation (ozzo-validation)
+     │
+     ▼
+ Service        — business logic, orchestrates repositories
+     │
+     ▼
+ Repository     — raw SQL against MySQL, maps rows to entities
 ```
 
 Errors flow back up the same pipeline as a `richerror.RichError` (carrying an operation name,
 a message, a `Kind`, and optional field-level metadata). The shared `mapper` package converts
-that into the right shape for whichever protocol is asking:
+that into a `google.golang.org/grpc/codes.Code` wrapped in a `status.Error`, so a gRPC client
+sees a proper gRPC status (e.g. `NotFound`, `PermissionDenied`, `Unauthenticated`) instead of
+a generic failure.
 
-- REST: an HTTP status code, serialized by the shared `response` package into one consistent
-  JSON envelope:
+## Migration History
 
-  ```json
-  {
-    "code": 200,
-    "message": "human readable message",
-    "data": { },
-    "errors": { }
-  }
-  ```
+This project used to be REST-only (Gin), then went through two migrations:
 
-- gRPC: a `google.golang.org/grpc/codes.Code` wrapped in a `status.Error`, so a gRPC client
-  sees a proper gRPC status (e.g. `NotFound`, `PermissionDenied`, `Unauthenticated`) instead of
-  a generic failure.
+1. **REST → gRPC** (done), via the strangler fig pattern: a gRPC server ran on `:50051` in a
+   goroutine alongside the existing Gin server on `:3000`, and each module was migrated one at
+   a time, both protocols sharing the same `validator` / `service` / `repository` layers and
+   the same MySQL database. Once every module had a gRPC equivalent, the entire REST/Gin
+   layer (`handler`, `middleware`, `router`, `server` packages) was deleted. The project is
+   now gRPC-only, on `:50051`, with [server reflection](https://github.com/grpc/grpc-go/tree/master/reflection)
+   enabled so tools like `grpcurl` or Postman/SpecHub can discover services without needing
+   the `.proto` files locally.
+2. **Monolith → microservices** (starting now), gradual and one module at a time — see
+   [`plans.md`](./plans.md) for the agreed approach (each extracted service gets its own
+   database from day one; every other module's in-process call into it gets rewired into a
+   real gRPC client call).
 
-## gRPC Migration
-
-This project is being converted from REST-only to gRPC using the **strangler fig pattern**:
-instead of a big-bang rewrite, a gRPC server is started in a goroutine alongside the existing
-Gin server, and each module is migrated one at a time. Both servers stay live throughout the
-migration, share the same MySQL database, and run inside the same process — there is no
-microservices split, that is an explicit separate future decision, not something this
-migration does implicitly.
-
-- **REST** stays on `:3000` (unchanged, module by module, until it's fully replaced).
-- **gRPC** runs on `:50051`, registered with [server reflection](https://github.com/grpc/grpc-go/tree/master/reflection) enabled so tools like `grpcurl` or Postman/SpecHub can discover services without needing the `.proto` files locally.
-- Authentication/authorization is enforced once, globally, via a single `grpc.UnaryServerInterceptor` (`internal/api/grpc/auth`). Methods that don't require a login are explicitly listed in a `publicMethods` allow-list, keyed by full method name (`/<package>.<Service>/<Method>`); everything else requires a valid `authorization: Bearer <token>` gRPC metadata header. Role-restricted methods (admin-only, for example) additionally call `auth.RequireRole(ctx, entity.AdminRole)` at the top of the handler.
-- `.proto` files live under `proto/<module>/`, one file per module, and generate into `internal/pb/<module>/` via `protoc` — see [Getting Started](#getting-started) for the exact command. Generated files are committed but never hand-edited.
-- The last step of the migration is deleting the Gin/REST layer entirely, once every module (including ones not yet built in REST, like cart/order/payment) has a gRPC equivalent.
+`.proto` files live under `proto/<module>/`, one file per module, and generate into
+`internal/pb/<module>/` via `protoc` — see [Getting Started](#getting-started) for the exact
+command. Generated files are committed but never hand-edited.
 
 Current per-module status is tracked in [`plans.md`](./plans.md); the short version is in
 [API Reference (gRPC)](#api-reference-grpc) below.
@@ -141,38 +132,41 @@ Current per-module status is tracked in [`plans.md`](./plans.md); the short vers
 
 ```
 shop/
-├── cmd/                      # composition root — wires repositories, services, REST handlers
-│                              # and gRPC servers per module
+├── cmd/                      # composition root — wires repositories, services, and gRPC
+│                              # servers per module, plus the single gRPC server entrypoint
 ├── proto/                    # .proto source files, one folder per module (source of truth)
 ├── internal/
 │   ├── api/
-│   │   ├── grpc/              # gRPC servers — one package per module, plus the shared auth
-│   │   │                      # interceptor (internal/api/grpc/auth) and the top-level Server
-│   │   │                      # that registers every service and starts listening on :50051
-│   │   ├── handler/          # REST (Gin) — one package per module
-│   │   ├── middleware/       # REST auth & role-based middleware
-│   │   ├── router/           # REST route registration
-│   │   └── server/           # REST HTTP server setup
+│   │   └── grpc/              # gRPC servers — one package per module, plus the auth package
+│   │                          # (authentication interceptor, authorization/role interceptor)
+│   │                          # and the top-level Server that registers every service and
+│   │                          # starts listening on :50051
 │   ├── config/                # .env + YAML config loading (koanf)
-│   ├── dto/                   # request/response shapes per module (shared by REST & gRPC)
+│   ├── dto/                   # request/response shapes per module
 │   ├── entity/                # domain models
 │   ├── migrator/              # golang-migrate wrapper, runs on startup
 │   ├── pb/                    # generated Go code from proto/ — never edited by hand
 │   ├── pkg/
 │   │   ├── claims/            # JWT access/refresh token creation & parsing
 │   │   ├── imageprocessor/    # upload validation, resize/encode, storage-agnostic save
-│   │   ├── mapper/             # richerror.Kind -> HTTP status code, and -> grpc/codes.Code
-│   │   ├── response/           # consistent JSON response envelope (REST only)
+│   │   ├── mapper/             # richerror.Kind -> grpc/codes.Code
 │   │   └── richerror/          # structured application error type
 │   ├── repository/mysql/      # one package per module, raw SQL
-│   ├── service/               # one package per module, business logic (shared by REST & gRPC)
-│   └── validator/             # one package per module, input validation (shared by REST & gRPC)
+│   ├── service/               # one package per module, business logic
+│   └── validator/             # one package per module, input validation
 ├── migrations/                 # golang-migrate SQL files
-├── uploads/                     # locally stored uploaded images (served at /uploads over REST)
+├── uploads/                     # locally stored uploaded images
 ├── config.yml
 ├── docker-compose.yml
-└── plans.md                     # module/endpoint checklist, REST + gRPC migration status
+└── plans.md                     # module/endpoint checklist, migration status
 ```
+
+> **Known gap:** uploaded images (avatars, category/product images) are still saved to
+> `uploads/` on local disk, but the REST layer used to serve them back over HTTP at
+> `/uploads/*` via Gin's static file route — that route is gone along with REST, and gRPC has
+> no equivalent built-in static file serving. This needs a real answer (a small dedicated
+> static-file HTTP server, or moving storage to something like S3 with public URLs) before any
+> front-end can actually display these images. Tracked in [`plans.md`](./plans.md).
 
 ## Getting Started
 
@@ -213,14 +207,12 @@ list of required keys) and adjust `config.yml` if needed.
 go run ./cmd
 ```
 
-Pending migrations run automatically on startup. Two servers come up from this one command:
-
-- REST at `http://localhost:3000` (or whatever `server.host`/`server.port` you configured)
-- gRPC at `0.0.0.0:50051`
+Pending migrations run automatically on startup, then the gRPC server starts and blocks on
+`0.0.0.0:50051`.
 
 ```bash
-curl http://localhost:3000/health-check
 grpcurl -plaintext localhost:50051 list
+grpcurl -plaintext localhost:50051 health.HealthService/Check
 ```
 
 ### Regenerating gRPC code after editing a `.proto` file
@@ -251,8 +243,8 @@ lowercasing and turning `__` into `.` (e.g. `MYSQL__HOST` → `mysql.host`).
 | `AUTH_SERVICE__ACCESS_TOKEN_SECRET` | Secret used to sign JWT access tokens |
 | `AUTH_SERVICE__REFRESH_TOKEN_SECRET` | Secret used to sign JWT refresh tokens |
 
-**`config.yml`** — non-secret settings (connection pool sizes, server timeouts, token
-durations, upload limits); see the file itself for the current values.
+**`config.yml`** — non-secret settings (connection pool sizes, token durations, upload
+limits); see the file itself for the current values.
 
 ### Manual migrations (optional)
 
@@ -267,83 +259,13 @@ migrate -source file://migrations -database "mysql://shop:shop-pass@(localhost:3
 migrate -source file://migrations -database "mysql://shop:shop-pass@(localhost:3308)/shop?parseTime=true&x-migrations-table=migrations" down
 ```
 
-## API Reference (REST)
-
-All responses use the envelope shown in [Architecture](#architecture). Endpoints marked 🔒
-require a valid `Authorization: Bearer <access-token>` header; 🔒👑 additionally requires the
-`ADMIN` role.
-
-### Health
-
-| Method | Path | Description |
-|---|---|---|
-| GET | `/health-check` | Liveness check |
-
-### Auth
-
-| Method | Path | Description |
-|---|---|---|
-| POST | `/auth/send-otp` | Request a one-time code for a phone number |
-| POST | `/auth/check-otp` | Verify the code, receive an access token (and a refresh token cookie) |
-| GET | `/auth/me` | 🔒 Get the current session's user id |
-| POST | `/auth/refresh-token` | Exchange a valid refresh token for a new access token |
-| POST | `/auth/logout` | 🔒 Revoke the current session |
-
-### User
-
-| Method | Path | Description |
-|---|---|---|
-| GET | `/user/profile` | 🔒 Get the current user's profile |
-| PATCH | `/user/update-profile` | 🔒 Update name and/or avatar |
-| PATCH | `/user/change-password` | 🔒 Set a new password |
-
-### Category
-
-| Method | Path | Description |
-|---|---|---|
-| POST | `/category` | 🔒👑 Create a category (root or one level of children) |
-| GET | `/category` | List all categories as a nested tree |
-| GET | `/category/:slug` | Get a single category by slug, including its children if it's a root category |
-| PATCH | `/category/:slug` | 🔒👑 Partially update a category (title/slug/image — only fields provided are changed) |
-| DELETE | `/category/:slug` | 🔒👑 Soft-delete a category (rejected if a root category still has children) |
-
-### Province
-
-| Method | Path | Description |
-|---|---|---|
-| GET | `/province` | List all provinces |
-| GET | `/province/:id` | Get a single province by id |
-
-### Address
-
-| Method | Path | Description |
-|---|---|---|
-| POST | `/address` | 🔒 Create a new shipping address |
-| GET | `/address` | 🔒 List the current user's addresses |
-| GET | `/address/:id` | 🔒 Get a single address by id |
-| PATCH | `/address/:id` | 🔒 Partially update an address (only fields provided are changed) |
-| DELETE | `/address/:id` | 🔒 Soft-delete an address |
-
-### Product
-
-| Method | Path | Description |
-|---|---|---|
-| POST | `/product` | 🔒👑 Create a product (main image + gallery images, price, optional stock, category) |
-| GET | `/product/:slug` | Get a single product by slug, including its gallery images |
-
-### Static files
-
-| Method | Path | Description |
-|---|---|---|
-| GET | `/uploads/*` | Serves uploaded images (avatars, category images) |
-
 ## API Reference (gRPC)
 
 Server reflection is enabled, so `grpcurl -plaintext localhost:50051 list` (or Postman/SpecHub
 with reflection) discovers everything below without needing the `.proto` files locally.
 Endpoints marked 🔒 require an `authorization: Bearer <access-token>` gRPC metadata header; 🔒👑
-additionally requires the `ADMIN` role (checked inside the handler via `auth.RequireRole`, not
-by the global interceptor).
+additionally requires the `ADMIN` role (enforced by the authorization interceptor via a
+declarative per-method role map, not inside the handler).
 
 ### `health.HealthService`
 
@@ -398,46 +320,48 @@ by the global interceptor).
 
 ### `product.ProductService`
 
-Not started yet — will be the first module to use gRPC client-streaming, for gallery image
-uploads.
+| Method | Description |
+|---|---|
+| `Create` | 🔒👑 Create a product — **client-streaming**: the client sends one `ProductMetadata` message followed by zero or more `GalleryImage` messages, then the server responds once with the created product |
+| `GetAll` | List products with pagination and an optional `category_slug` filter (price filter, search, and sort are not built yet) |
+| `GetOneBySlug` | Get a single product by slug, including its gallery images |
+
+`Update` and `Delete` for products are not built yet.
 
 ## Authentication Flow
 
-1. **`send-otp`** (REST: `POST /auth/send-otp`, gRPC: `auth.AuthService/SendOtp`) — client
-   submits a phone number. The server finds or creates a user for that number and generates a
-   5-digit code with `crypto/rand`, valid for a short window (`otp_code_duration`).
-2. **`check-otp`** (REST: `POST /auth/check-otp`, gRPC: `auth.AuthService/CheckOtp`) — client
-   submits the phone number and code. On success, the server creates a **session record** in
-   the database and issues a short-lived **access token** and a longer-lived **refresh
-   token**, both JWTs carrying the session id.
-3. Protected routes/methods go through the auth check for their protocol — Gin's
-   `AuthRequired` middleware for REST, or the shared `grpc.UnaryServerInterceptor` for gRPC —
-   which parses the access token, loads the referenced session, and rejects the request if the
-   session has expired or been revoked. Both read the token the same way: `Authorization:
-   Bearer <token>` as an HTTP header for REST, `authorization: Bearer <token>` as gRPC metadata.
-4. **`refresh-token`** — when the access token expires, the client exchanges the refresh token
-   for a new access token, as long as the underlying session is still valid. (REST reads it
-   from an httpOnly cookie; gRPC has no cookie mechanism, so it's an explicit field on
-   `RefreshTokenRequest` instead.)
-5. **`logout`** — revokes the session server-side, so both existing and any future
+1. **`SendOtp`** (`auth.AuthService/SendOtp`) — client submits a phone number. The server
+   finds or creates a user for that number and generates a 5-digit code with `crypto/rand`,
+   valid for a short window (`otp_code_duration`).
+2. **`CheckOtp`** (`auth.AuthService/CheckOtp`) — client submits the phone number and code. On
+   success, the server creates a **session record** in the database and issues a short-lived
+   **access token** and a longer-lived **refresh token**, both JWTs carrying the session id.
+3. Protected methods go through the shared `grpc.UnaryServerInterceptor` /
+   `grpc.StreamServerInterceptor` pair, which parses the access token from the
+   `authorization: Bearer <token>` gRPC metadata, loads the referenced session, and rejects
+   the call if the session has expired or been revoked.
+4. **`RefreshToken`** — when the access token expires, the client exchanges the refresh token
+   (sent as an explicit field on `RefreshTokenRequest`) for a new access token, as long as the
+   underlying session is still valid.
+5. **`Logout`** — revokes the session server-side, so both existing and any future
    access/refresh tokens issued for it stop working immediately. This is the key advantage
-   over plain stateless JWTs, where logout can only ever be simulated client-side — and it's
-   enforced identically for both protocols, since both check session revocation in the
-   database rather than trusting the JWT signature alone.
+   over plain stateless JWTs, where logout can only ever be simulated client-side.
 
 ## Roadmap
 
-Tracked in detail in [`plans.md`](./plans.md). Foundational modules (config, error handling,
-migrations, HTTP server) and the auth/user/category/province/address modules are done on both
-REST and gRPC. Still to build/migrate, in rough priority order:
+Tracked in detail in [`plans.md`](./plans.md). The REST → gRPC migration is complete —
+health, auth, user, category, province, address, and product all have working gRPC
+equivalents, and the REST/Gin layer has been removed entirely. Next up, in rough priority
+order:
 
-- [ ] **Product** — REST create + get-by-slug are done; REST listing/update/delete still
-  pending, and the gRPC equivalent hasn't started yet (this will introduce client-streaming
-  for gallery image uploads)
-- [ ] **Cart** — add/update/remove items, view current cart (REST first, gRPC to follow)
+- [ ] Decide how uploaded images get served now that Gin's static `/uploads` route is gone
+- [ ] **Cart** — add/update/remove items, view current cart
 - [ ] **Order** — checkout from cart, order history, status transitions
 - [ ] **Payment** — payment initiation and gateway callback handling
-- [ ] **Remove the REST/Gin layer** once every module above has a working gRPC equivalent
+- [ ] **Product** — listing filters (price, search, sort), update, delete
+- [ ] **Microservices migration** — split this monolith into independently deployable
+  services, one module at a time, each with its own database; see
+  [Migration History](#migration-history) and [`plans.md`](./plans.md)
 - [ ] Nice-to-have: reviews, wishlist, coupons
 
 ## License
