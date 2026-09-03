@@ -55,16 +55,18 @@ func NewInterceptor(repository Repository, accessTokenSecret string) Interceptor
 }
 
 var publicMethods = map[string]bool{
-	"/auth.AuthService/SendOtp":            true,
-	"/auth.AuthService/CheckOtp":           true,
-	"/auth.AuthService/RefreshToken":       true,
-	"/health.HealthService/Check":          true,
-	"/category.CategoryService/GetAll":     true,
-	"/category.CategoryService/GetOne":     true,
-	"/province.ProvinceService/GetOne":     true,
-	"/province.ProvinceService/GetAll":     true,
-	"/product.ProductService/GetAll":       true,
-	"/product.ProductService/GetOneBySlug": true,
+	"/auth.AuthService/SendOtp":                                      true,
+	"/auth.AuthService/CheckOtp":                                     true,
+	"/auth.AuthService/RefreshToken":                                 true,
+	"/health.HealthService/Check":                                    true,
+	"/category.CategoryService/GetAll":                               true,
+	"/category.CategoryService/GetOne":                               true,
+	"/province.ProvinceService/GetOne":                               true,
+	"/province.ProvinceService/GetAll":                               true,
+	"/product.ProductService/GetAll":                                 true,
+	"/product.ProductService/GetOneBySlug":                           true,
+	"/grpc.reflection.v1.ServerReflection/ServerReflectionInfo":      true,
+	"/grpc.reflection.v1alpha.ServerReflection/ServerReflectionInfo": true,
 }
 
 func (i Interceptor) authenticate(ctx context.Context) (context.Context, error) {
