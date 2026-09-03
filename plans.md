@@ -23,21 +23,40 @@ on `:50051`, single database, single binary.
 ## Microservices migration (next phase)
 
 Now that the whole API is gRPC-only, the next phase is splitting this single monolith
-process into independently deployable services. Agreed approach:
+process into independently deployable services. Because this is a learning project, the
+end goal is deliberately fine-grained: **every** module becomes its own independent service
+(own binary, own database) — not just one or two extracted while the rest stay in the
+monolith.
 
 - Gradual, one service at a time — not a big-bang split of the whole system at once.
 - Each extracted service gets its own database from day one (real data ownership per
   service, not a shared-DB "distributed monolith" stepping stone).
-- Every other module's direct in-process call into the extracted service (e.g. product's
-  `categoryService category.Service` dependency) must be rewired from a plain Go function
-  call into a real gRPC client call over the network — this is the actual cost of each
-  extraction, and the reason it's done deliberately one module at a time instead of all at
-  once.
+- Every other module's direct in-process call into an extracted service (e.g. product's
+  `categoryService category.Service` dependency) gets rewired from a plain Go function call
+  into a real gRPC client call over the network — the actual cost of each extraction, and
+  the reason it's done one module at a time instead of all at once.
+- `auth` is deliberately extracted last: it's currently a cross-cutting concern (the shared
+  interceptor validates every request for every module), so splitting it means deciding how
+  every already-extracted service authenticates a request once that check is no longer an
+  in-process call. Better to have the extraction mechanics down from simpler cases first.
 
-- [ ] decide which module goes first
-- [ ] design the data-ownership / migration plan for that module's tables
-- [ ] introduce a gRPC client (instead of a direct Go interface) wherever another module
-      currently calls it in-process
+Extraction order (simplest/most isolated first, hardest/most foundational last):
+
+- [ ] 1. `health` — no database, no dependencies; pure exercise in "separate binary,
+      separate port, separate deployment" with zero data or networking complexity
+- [ ] 2. `province` — first real data-ownership split (own table -> own database); still no
+      dependency on any other module
+- [ ] 3. `category` — same shape as province (no outgoing dependency), but with real admin
+      role checks and image upload
+- [ ] 4. `address` — first real inter-service gRPC client: depends on `province`
+- [ ] 5. `product` — second inter-service gRPC client, more complex domain: depends on
+      `category`, plus client-streaming
+- [ ] 6. `user` — mostly self-contained, but still needs a working answer for "how does a
+      request get authenticated" once auth is external
+- [ ] 7. `auth` — last: requires a real decision on how every other service validates
+      tokens/sessions without an in-process call (e.g. per-request RPC to auth vs. local JWT
+      signature verification + occasional revocation check)
+
 - [ ] decide on service discovery / addressing between services
 - [ ] decide on deployment shape (separate binaries? separate repos? multiple `cmd/` entries
       in this repo?)
