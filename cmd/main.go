@@ -28,7 +28,7 @@ func main() {
 	categoryHandler, categoryService, grpcCategoryServer := SetupCategoryModule(mysqlRepo, config.Upload)
 	provinceHandler, provinceService, grpcProvinceServer := setupProvinceModule(mysqlRepo)
 	addressHandler, grpcAddressServer := setupAddressModule(mysqlRepo, provinceService)
-	productHandler := setupProductModule(config.Upload, mysqlRepo, categoryService)
+	productHandler, grpcProductServer := setupProductModule(config.Upload, mysqlRepo, categoryService)
 
 	grpcHealthServer := grpchealth.New()
 
@@ -40,6 +40,7 @@ func main() {
 		grpcCategoryServer,
 		grpcProvinceServer,
 		grpcAddressServer,
+		grpcProductServer,
 		authInterceptor,
 	).Run()
 

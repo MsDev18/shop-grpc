@@ -1,6 +1,7 @@
 package product
 
 import (
+	"io"
 	dto "shop/internal/dto/product"
 	"shop/internal/pkg/response"
 	"shop/internal/pkg/richerror"
@@ -60,7 +61,25 @@ func (h Handler) Create(ctx *gin.Context) {
 		return
 	}
 
-	mainImage, _ := ctx.FormFile("main-image")
+	var mainImage *dto.ImageFile
+	if fileHeader, ferr := ctx.FormFile("main-image"); ferr == nil && fileHeader != nil {
+		file, openErr := fileHeader.Open()
+		if openErr != nil {
+			response.New(ctx).Error(
+				richerror.New().SetOp(op).SetMsg("can't open main image").SetKind(richerror.KindBadRequestErr).SetErr(openErr),
+			)
+			return
+		}
+		content, readErr := io.ReadAll(file)
+		file.Close()
+		if readErr != nil {
+			response.New(ctx).Error(
+				richerror.New().SetOp(op).SetMsg("can't read main image").SetKind(richerror.KindUnexpectedErr).SetErr(readErr),
+			)
+			return
+		}
+		mainImage = &dto.ImageFile{Filename: fileHeader.Filename, Content: content}
+	}
 
 	form, err := ctx.MultipartForm()
 	if err != nil {
@@ -74,7 +93,25 @@ func (h Handler) Create(ctx *gin.Context) {
 		return
 	}
 
-	images := form.File["images"]
+	var images []*dto.ImageFile
+	for _, fh := range form.File["images"] {
+		file, openErr := fh.Open()
+		if openErr != nil {
+			response.New(ctx).Error(
+				richerror.New().SetOp(op).SetMsg("can't open gallery image").SetKind(richerror.KindBadRequestErr).SetErr(openErr),
+			)
+			return
+		}
+		content, readErr := io.ReadAll(file)
+		file.Close()
+		if readErr != nil {
+			response.New(ctx).Error(
+				richerror.New().SetOp(op).SetMsg("can't read gallery image").SetKind(richerror.KindUnexpectedErr).SetErr(readErr),
+			)
+			return
+		}
+		images = append(images, &dto.ImageFile{Filename: fh.Filename, Content: content})
+	}
 
 	// create dto.CreateResponse
 	req := dto.CreateRequest{

@@ -2,19 +2,13 @@ package category
 
 import (
 	"context"
-	"shop/internal/api/grpc/auth"
-	"shop/internal/entity"
+	dto "shop/internal/dto/category"
 	pb "shop/internal/pb/category"
 	"shop/internal/pkg/mapper"
-	dto "shop/internal/dto/category"
 )
 
-func (s Server ) Update (ctx context.Context, req *pb.UpdateRequest) (*pb.CategoryResponse, error) {
+func (s Server) Update(ctx context.Context, req *pb.UpdateRequest) (*pb.CategoryResponse, error) {
 	const op = "category-grpc.Update"
-
-	if err := auth.RequireRole(ctx , entity.AdminRole) ; err != nil {
-		return &pb.CategoryResponse{} , mapper.ErrorToGrpc(err)
-	}
 
 	var image *dto.ImageFile
 	if len(req.GetImage()) > 0 {

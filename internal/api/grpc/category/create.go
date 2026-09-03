@@ -2,8 +2,6 @@ package category
 
 import (
 	"context"
-	"shop/internal/api/grpc/auth"
-	"shop/internal/entity"
 	pb "shop/internal/pb/category"
 	"shop/internal/pkg/mapper"
 	dto "shop/internal/dto/category"
@@ -11,10 +9,6 @@ import (
 
 func (s Server) Create(ctx context.Context, req *pb.CreateRequest) (*pb.CategoryResponse, error) {
 	const op = "category-grpc.Create"
-
-	if err := auth.RequireRole(ctx, entity.AdminRole) ; err != nil {
-		return nil , mapper.ErrorToGrpc(err)
-	}
 
 	var parentID *uint
 	if req.ParentId != nil {

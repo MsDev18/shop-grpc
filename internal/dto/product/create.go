@@ -1,7 +1,5 @@
 package product
 
-import "mime/multipart"
-
 type CreateRequest struct {
 	Name        string
 	Slug        string
@@ -9,8 +7,8 @@ type CreateRequest struct {
 	Price       uint
 	Stock       *uint
 	CategoryID  uint
-	MainImage   *multipart.FileHeader
-	Images      []*multipart.FileHeader
+	MainImage   *ImageFile
+	Images      []*ImageFile
 }
 
 type CreateResponse struct {

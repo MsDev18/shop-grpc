@@ -9,15 +9,19 @@ import (
 	"shop/internal/service/category"
 	service "shop/internal/service/product"
 	validator "shop/internal/validator/product"
+	grpcproduct "shop/internal/api/grpc/product"
 )
 
-func setupProductModule(config imageprocessor.Config, mysqlRepo mysql.Connection,categoryService category.Service) handler.Handler {
+func setupProductModule(config imageprocessor.Config, mysqlRepo mysql.Connection,categoryService category.Service) (handler.Handler, grpcproduct.Server) {
 	repository := repository.New(mysqlRepo)
 
 	storage := localstorage.New("product")
 	imageProcessor := imageprocessor.New(config, storage)
 
-	service := service.New(repository,categoryService, imageProcessor)
-	validator := validator.New()
-	return handler.New(service, validator)
+	svc := service.New(repository,categoryService, imageProcessor)
+	val := validator.New()
+
+	grpcproduct := grpcproduct.New(svc , val)
+
+	return handler.New(svc, val), grpcproduct
 }

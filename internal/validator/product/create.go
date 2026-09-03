@@ -3,8 +3,6 @@ package product
 import (
 	"context"
 	"errors"
-	"io"
-	"mime/multipart"
 	"net/http"
 	dto "shop/internal/dto/product"
 	"shop/internal/pkg/richerror"
@@ -55,48 +53,40 @@ func (v Validator) Create(ctx context.Context, req dto.CreateRequest) error {
 func (v Validator) validationImage(value any) error {
 	const op = "product-validator.validationImage"
 
-	var fileHeader *multipart.FileHeader
-	switch fh := value.(type) {
-	case *multipart.FileHeader:
-		fileHeader = fh
-	case multipart.FileHeader:
-		fileHeader = &fh
-	default:
+	// var fileHeader *multipart.FileHeader
+	// switch fh := value.(type) {
+	// case *multipart.FileHeader:
+	// 	fileHeader = fh
+	// case multipart.FileHeader:
+	// 	fileHeader = &fh
+	// default:
+	// 	return richerror.New().
+	// 		SetOp(op).
+	// 		SetMsg("type assertion error").
+	// 		SetKind(richerror.KindBadRequestErr)
+	// }
+
+	image, ok := value.(*dto.ImageFile)
+	if !ok || image == nil {
 		return richerror.New().
 			SetOp(op).
-			SetMsg("type assertion error").
+			SetMsg("invalid image").
 			SetKind(richerror.KindBadRequestErr)
 	}
 
-	if fileHeader.Size > 1024*300 {
+	if len(image.Content) > 1024*300 {
 		return richerror.New().
 			SetOp(op).
-			SetMsg("product main image max size is 300KB").
+			SetMsg("product image max size is 300KB").
 			SetKind(richerror.KindBadRequestErr)
 	}
 
-	file, err := fileHeader.Open()
-	if err != nil {
-		return richerror.New().
-			SetOp(op).
-			SetMsg("can't open image file").
-			SetKind(richerror.KindUnexpectedErr).
-			SetErr(err)
-	}
-	defer file.Close()
-
-	buf := make([]byte, 512)
-
-	n, err := file.Read(buf)
-	if err != nil && !errors.Is(err, io.EOF) {
-		return richerror.New().
-			SetOp(op).
-			SetMsg("can't read file").
-			SetKind(richerror.KindUnexpectedErr).
-			SetErr(err)
+	n := len(image.Content)
+	if n > 512 {
+		n = 512
 	}
 
-	contentType := http.DetectContentType(buf[:n])
+	contentType := http.DetectContentType(image.Content[:n])
 	if contentType != "image/png" && contentType != "image/jpeg" {
 		return richerror.New().
 			SetOp(op).

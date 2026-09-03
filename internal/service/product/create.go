@@ -1,6 +1,7 @@
 package product
 
 import (
+	"bytes"
 	"context"
 	dto "shop/internal/dto/product"
 	"shop/internal/entity"
@@ -25,37 +26,15 @@ func (s Service) Create(ctx context.Context, req dto.CreateRequest) (dto.CreateR
 			SetMsg("conflict slug , this slug already exists").
 			SetKind(richerror.KindConflictErr)
 	}
-
 	// process main image
-	mainImageFile, openErr := req.MainImage.Open()
-	if openErr != nil {
-		return dto.CreateResponse{}, richerror.New().
-			SetOp(op).
-			SetMsg("can't open uploaded main image").
-			SetKind(richerror.KindBadRequestErr).
-			SetErr(openErr)
-	}
-	defer mainImageFile.Close()
-
-	mainImage, err := s.imageProcessor.Process(ctx, mainImageFile)
+	mainImage, err := s.imageProcessor.Process(ctx, bytes.NewReader(req.MainImage.Content))
 	if err != nil {
 		return dto.CreateResponse{}, err
 	}
-
-	// process gallery images
+	// process images
 	imagePaths := make([]string, 0, len(req.Images))
 	for _, image := range req.Images {
-		file, openErr := image.Open()
-		if openErr != nil {
-			return dto.CreateResponse{}, richerror.New().
-				SetOp(op).
-				SetMsg("can't open uploaded gallery image").
-				SetKind(richerror.KindBadRequestErr).
-				SetErr(openErr)
-		}
-
-		path, err := s.imageProcessor.Process(ctx, file)
-		file.Close()
+		path, err := s.imageProcessor.Process(ctx, bytes.NewReader(image.Content))
 		if err != nil {
 			return dto.CreateResponse{}, err
 		}

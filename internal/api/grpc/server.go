@@ -8,6 +8,7 @@ import (
 	"shop/internal/api/grpc/auth"
 	"shop/internal/api/grpc/category"
 	"shop/internal/api/grpc/health"
+	"shop/internal/api/grpc/product"
 	"shop/internal/api/grpc/province"
 	"shop/internal/api/grpc/user"
 	addresspb "shop/internal/pb/address"
@@ -16,7 +17,7 @@ import (
 	healthpb "shop/internal/pb/health"
 	provincepb "shop/internal/pb/province"
 	userpb "shop/internal/pb/user"
-
+	productpb "shop/internal/pb/product"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -29,19 +30,25 @@ type Server struct {
 	categoryServer category.Server
 	provinceServer province.Server
 	addressServer  address.Server
+	productServer product.Server
 	address        string
 }
 
-func New(addr string, healthServer health.Server, authServer auth.Server, userServer user.Server, categoryServer category.Server, provinceServer province.Server, addressServer address.Server, authInterceptor auth.Interceptor) Server {
+func New(addr string, healthServer health.Server, authServer auth.Server, userServer user.Server, categoryServer category.Server, provinceServer province.Server, addressServer address.Server,productServer product.Server, authInterceptor auth.Interceptor) Server {
+	roleInterceptor := auth.NewRoleInterceptor()
 	return Server{
 		address:        addr,
-		grpcServer:     grpc.NewServer(grpc.UnaryInterceptor(authInterceptor.Unary())),
+		grpcServer:     grpc.NewServer(
+			grpc.ChainUnaryInterceptor(authInterceptor.Unary(), roleInterceptor.Unary()),
+			grpc.ChainStreamInterceptor(authInterceptor.Stream(), roleInterceptor.Stream()),
+		),
 		healthServer:   healthServer,
 		authServer:     authServer,
 		userServer:     userServer,
 		categoryServer: categoryServer,
-		addressServer:  addressServer,
 		provinceServer: provinceServer,
+		addressServer:  addressServer,
+		productServer:  productServer,	
 	}
 }
 
@@ -52,6 +59,7 @@ func (s Server) Run() {
 	categorypb.RegisterCategoryServiceServer(s.grpcServer, s.categoryServer)
 	provincepb.RegisterProvinceServiceServer(s.grpcServer, s.provinceServer)
 	addresspb.RegisterAddressServiceServer(s.grpcServer, s.addressServer)
+	productpb.RegisterProductServiceServer(s.grpcServer, s.productServer)
 
 	reflection.Register(s.grpcServer)
 
