@@ -22,8 +22,7 @@ func main() {
 	grpcAuthServer, authInterceptor := SetupAuthModule(mysqlRepo, config.AuthService)
 	grpcUserServer := SetupUserModule(mysqlRepo, config.Upload)
 	grpcCategoryServer, categoryService := SetupCategoryModule(mysqlRepo, config.Upload)
-	grpcProvinceServer, provinceService := setupProvinceModule(mysqlRepo)
-	grpcAddressServer := setupAddressModule(mysqlRepo, provinceService)
+	grpcAddressServer := setupAddressModule(mysqlRepo, "0.0.0.0:50053")
 	grpcProductServer := setupProductModule(config.Upload, mysqlRepo, categoryService)
 
 
@@ -32,7 +31,6 @@ func main() {
 		grpcAuthServer,
 		grpcUserServer,
 		grpcCategoryServer,
-		grpcProvinceServer,
 		grpcAddressServer,
 		grpcProductServer,
 		authInterceptor,

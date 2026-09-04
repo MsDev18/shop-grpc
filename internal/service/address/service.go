@@ -2,13 +2,17 @@ package address
 
 import (
 	"context"
+	provincedto "shop/internal/dto/province"
 	"shop/internal/entity"
-	"shop/internal/service/province"
 )
 
+type ProvinceService interface {
+	GetOne(ctx context.Context, id uint) (provincedto.GetOneResponse, error)
+	GetAll(ctx context.Context) ([]provincedto.GetOneResponse, error)
+}
 type Service struct {
 	repository      Repository
-	provinceService province.Service
+	provinceService ProvinceService
 }
 
 type Repository interface {
@@ -19,7 +23,7 @@ type Repository interface {
 	Update(ctx context.Context, userID uint, addressID uint, title *string, provinceID *uint, city, address, postalCode *string) error
 }
 
-func New(repository Repository, provinceService province.Service) Service {
+func New(repository Repository, provinceService ProvinceService) Service {
 	return Service{
 		repository:      repository,
 		provinceService: provinceService,

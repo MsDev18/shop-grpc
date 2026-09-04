@@ -10,13 +10,11 @@ import (
 	"shop/internal/api/grpc/auth"
 	"shop/internal/api/grpc/category"
 	"shop/internal/api/grpc/product"
-	"shop/internal/api/grpc/province"
 	"shop/internal/api/grpc/user"
 	addresspb "shop/internal/pb/address"
 	authpb "shop/internal/pb/auth"
 	categorypb "shop/internal/pb/category"
 	productpb "shop/internal/pb/product"
-	provincepb "shop/internal/pb/province"
 	userpb "shop/internal/pb/user"
 )
 
@@ -25,13 +23,12 @@ type Server struct {
 	authServer     auth.Server
 	userServer     user.Server
 	categoryServer category.Server
-	provinceServer province.Server
 	addressServer  address.Server
 	productServer  product.Server
 	address        string
 }
 
-func New(addr string, authServer auth.Server, userServer user.Server, categoryServer category.Server, provinceServer province.Server, addressServer address.Server, productServer product.Server, authInterceptor auth.Interceptor) Server {
+func New(addr string, authServer auth.Server, userServer user.Server, categoryServer category.Server, addressServer address.Server, productServer product.Server, authInterceptor auth.Interceptor) Server {
 	roleInterceptor := auth.NewRoleInterceptor()
 	return Server{
 		address: addr,
@@ -42,7 +39,6 @@ func New(addr string, authServer auth.Server, userServer user.Server, categorySe
 		authServer:     authServer,
 		userServer:     userServer,
 		categoryServer: categoryServer,
-		provinceServer: provinceServer,
 		addressServer:  addressServer,
 		productServer:  productServer,
 	}
@@ -52,7 +48,6 @@ func (s Server) Run() {
 	authpb.RegisterAuthServiceServer(s.grpcServer, s.authServer)
 	userpb.RegisterUserServiceServer(s.grpcServer, s.userServer)
 	categorypb.RegisterCategoryServiceServer(s.grpcServer, s.categoryServer)
-	provincepb.RegisterProvinceServiceServer(s.grpcServer, s.provinceServer)
 	addresspb.RegisterAddressServiceServer(s.grpcServer, s.addressServer)
 	productpb.RegisterProductServiceServer(s.grpcServer, s.productServer)
 
