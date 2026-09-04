@@ -3,7 +3,6 @@ package main
 import (
 	_ "github.com/go-sql-driver/mysql"
 	grpcserver "shop/internal/api/grpc"
-	grpchealth "shop/internal/api/grpc/health"
 	"shop/internal/migrator"
 	"shop/internal/repository/mysql"
 )
@@ -27,11 +26,9 @@ func main() {
 	grpcAddressServer := setupAddressModule(mysqlRepo, provinceService)
 	grpcProductServer := setupProductModule(config.Upload, mysqlRepo, categoryService)
 
-	grpcHealthServer := grpchealth.New()
 
 	grpcserver.New(
 		"0.0.0.0:50051",
-		grpcHealthServer,
 		grpcAuthServer,
 		grpcUserServer,
 		grpcCategoryServer,

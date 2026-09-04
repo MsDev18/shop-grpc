@@ -11,7 +11,23 @@ services:
       MYSQL_USER: shop
       MYSQL_PASSWORD: shop-pass
     volumes:
-      - mysql-data:/mysql-data:/var/lib/mysql
+      - mysql-data:/var/lib/mysql
+    networks:
+      - shop-network
+
+  mysql_province_container:
+    container_name: mysql_province_container
+    image: mysql:8.4
+    restart: unless-stopped
+    ports:
+      - 3309:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: root-pass
+      MYSQL_DATABASE: province
+      MYSQL_USER: province
+      MYSQL_PASSWORD: province-pass
+    volumes:
+      - mysql-province-data:/var/lib/mysql
     networks:
       - shop-network
 
@@ -29,6 +45,7 @@ services:
 
 volumes:
   mysql-data:
+  mysql-province-data:
 
 networks:
   shop-network:

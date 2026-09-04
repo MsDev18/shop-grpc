@@ -42,8 +42,9 @@ monolith.
 
 Extraction order (simplest/most isolated first, hardest/most foundational last):
 
-- [ ] 1. `health` — no database, no dependencies; pure exercise in "separate binary,
-      separate port, separate deployment" with zero data or networking complexity
+- [x] 1. `health` — no database, no dependencies; pure exercise in "separate binary,
+      separate port, separate deployment" with zero data or networking complexity.
+      `cmd/health_service/main.go`, own `grpc.Server`, no interceptors, port `:50052`.
 - [ ] 2. `province` — first real data-ownership split (own table -> own database); still no
       dependency on any other module
 - [ ] 3. `category` — same shape as province (no outgoing dependency), but with real admin

@@ -30,3 +30,9 @@ func (k KoanfConfig) GetConfig() Config {
 	k.koanf.Unmarshal("", &cfg)
 	return cfg
 }
+
+func (k KoanfConfig) GetMySQLConfig() mysql.Config {
+	var cfg mysql.Config
+	k.koanf.Unmarshal("mysql", &cfg)
+	return cfg
+}

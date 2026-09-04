@@ -27,3 +27,19 @@ func New(dsn string) Migrator {
 		migrate: migration,
 	}
 }
+
+// internal/migrator/migrator.go — یک تابع جدید کنار New اضافه کن
+func NewWithSourcePath(sourcePath string, dsn string) Migrator {
+	newDSN := fmt.Sprintf("mysql://%s&x-migrations-table=migrations", dsn)
+	migration, err := migrate.New(
+		fmt.Sprintf("file://%s", sourcePath),
+		newDSN,
+	)
+	if err != nil {
+		panic(fmt.Errorf("error in migration : %w", err))
+	}
+
+	return Migrator{
+		migrate: migration,
+	}
+}
